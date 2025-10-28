@@ -1,0 +1,22 @@
+{
+  "name": "intensity-segments",
+  "version": "1.0.0",
+  "description": "A program that manages intensity by segments",
+  "type": "module",
+  "main": "src/IntensitySegments.js",
+  "scripts": {
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui"
+  },
+  "keywords": [
+    "segments",
+    "intensity",
+    "intervals"
+  ],
+  "author": "Wenfang Du",
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^1.0.4"
+  }
+}
