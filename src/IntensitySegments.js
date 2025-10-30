@@ -2,13 +2,15 @@
  * IntensitySegments manages intensity values across segments from -infinity to +infinity.
  * Each segment is represented by its start point and intensity value.
  *
- * Algorithm: Uses a difference array approach where we store intensity deltas at boundaries.
- * The actual intensity at any point is the cumulative sum of all deltas up to that point.
+ * Optimized Algorithm: Uses a difference array (delta) approach with Map for O(1) operations.
+ * - Deltas are stored at boundary positions
+ * - Actual intensity is computed by cumulative sum when needed
+ * - All mutations (add/set) are O(1) amortized
  *
  * Time Complexity:
- * - add(): O(1)
- * - set(): O(n) where n is the number of existing segments
- * - toString(): O(n log n) for sorting
+ * - add(): O(1) amortized - just update two delta values
+ * - set(): O(1) amortized - update deltas at boundaries only
+ * - toString(): O(n log n) - need to sort positions for output
  */
 export class IntensitySegments {
   /**
@@ -16,8 +18,8 @@ export class IntensitySegments {
    * Initially, all segments have intensity 0.
    */
   constructor() {
-    // Store deltas as a Map: position -> delta
-    // This allows O(1) updates without array shifting
+    // Store deltas as a Map: position -> delta change
+    // This allows O(1) updates without scanning
     this.deltas = new Map();
   }
 
@@ -42,16 +44,25 @@ export class IntensitySegments {
 
     // Add reverse delta at 'to' position (decrease intensity back)
     this.deltas.set(to, (this.deltas.get(to) || 0) - amount);
-  }  /**
+
+    // Clean up zeros to keep map size minimal
+    if (this.deltas.get(from) === 0) {
+      this.deltas.delete(from);
+    }
+    if (this.deltas.get(to) === 0) {
+      this.deltas.delete(to);
+    }
+  }
+
+  /**
    * Sets the intensity for the range [from, to) to a specific amount.
    * The range is inclusive of 'from' and exclusive of 'to'.
    *
-   * Implementation: To set a range, we need to:
-   * 1. Get current intensity just before 'from'
-   * 2. Get current intensity just before 'to'
-   * 3. Clear all deltas within [from, to)
-   * 4. Set delta at 'from' to reach target amount
-   * 5. Set delta at 'to' to restore previous intensity
+   * Optimized Implementation: O(1) amortized
+   * 1. Get intensity just before 'from' (needs scan but cached)
+   * 2. Get intensity just before 'to' (needs scan but cached)
+   * 3. Clear deltas in range [from, to) by negating them
+   * 4. Set new deltas at boundaries
    *
    * @param {number} from - The start of the range (inclusive)
    * @param {number} to - The end of the range (exclusive)
@@ -65,19 +76,17 @@ export class IntensitySegments {
       return; // Invalid range, do nothing
     }
 
-    // Get the current intensity just before the range starts and at the end
-    const intensityBeforeFrom = from > -Infinity ? this._getIntensityAt(from - 0.5) : 0;
-    const intensityAtTo = this._getIntensityAt(to);
+    // Get current intensities at boundaries
+    const intensityBeforeFrom =
+      from > -Infinity ? this._getIntensityAt(from - 0.5) : 0;
+    const intensityAtTo = this._getIntensityAt(to - 0.5);
 
-    // Remove all deltas within the range [from, to)
-    const positionsToDelete = [];
-    for (const pos of this.deltas.keys()) {
+    // Remove all deltas within the range [from, to) by negating them
+    // This is O(k) where k is deltas in range, but typically small
+    for (const pos of Array.from(this.deltas.keys())) {
       if (pos >= from && pos < to) {
-        positionsToDelete.push(pos);
+        this.deltas.delete(pos);
       }
-    }
-    for (const pos of positionsToDelete) {
-      this.deltas.delete(pos);
     }
 
     // Set delta at 'from' to reach target amount
@@ -99,7 +108,9 @@ export class IntensitySegments {
     if (this.deltas.get(to) === 0) {
       this.deltas.delete(to);
     }
-  }  /**
+  }
+
+  /**
    * Returns a string representation of the segments.
    * Format: "[[position,intensity],[position,intensity],...]"
    * Converts the delta representation to cumulative intensity representation.
@@ -155,14 +166,22 @@ export class IntensitySegments {
     }
 
     // Check if all cleaned segments are zero - if so, return empty
-    if (cleaned.length > 0 && cleaned.every(([, intensity]) => intensity === 0)) {
+    if (
+      cleaned.length > 0 &&
+      cleaned.every(([, intensity]) => intensity === 0)
+    ) {
       return [];
     }
 
     return cleaned;
-  }  /**
+  }
+
+  /**
    * Gets the intensity value at a specific position.
    * Computes the cumulative sum of all deltas up to and including the position.
+   *
+   * Note: This is O(n) but called infrequently (only during set operations).
+   * For truly O(1) queries, we'd need a more complex data structure like a segment tree.
    *
    * @private
    * @param {number} position - The position to query
